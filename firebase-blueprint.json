@@ -1,0 +1,144 @@
+{
+  "entities": {
+    "Estimation": {
+      "title": "Estimation",
+      "description": "A quote or proforma invoice.",
+      "type": "object",
+      "properties": {
+        "estimationNumber": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "partyId": { "type": "string" },
+        "grandTotal": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "sent", "converted", "expired", "declined"] }
+      },
+      "required": ["estimationNumber", "date", "partyId", "grandTotal", "status"]
+    },
+    "Party": {
+      "title": "Party",
+      "description": "A customer or vendor involved in a transaction.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Legal name of the party." },
+        "gstin": { "type": "string", "description": "GST Identification Number." },
+        "address": { "type": "string", "description": "Full billing/shipping address." },
+        "stateCode": { "type": "string", "description": "Two-digit state code (e.g., '27' for Maharashtra)." },
+        "type": { "type": "string", "enum": ["customer", "vendor"], "description": "Role of the party." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "stateCode", "type"]
+    },
+    "Item": {
+      "title": "Item",
+      "description": "A product or service that can be invoiced.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the item/service." },
+        "hsn": { "type": "string", "description": "HSN or SAC code." },
+        "price": { "type": "number", "description": "Default unit price." },
+        "gstRate": { "type": "number", "description": "Applicable GST percentage (e.g., 18)." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "gstRate"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "A GST-compliant invoice document.",
+      "type": "object",
+      "properties": {
+        "invoiceNumber": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "partyId": { "type": "string" },
+        "partyDetails": { "type": "object" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "totalGst": { "type": "number" },
+        "roundOff": { "type": "number" },
+        "grandTotal": { "type": "number" },
+        "amountPaid": { "type": "number", "description": "Total amount received for this invoice." },
+        "status": { "type": "string", "enum": ["pending", "partial", "paid"] },
+        "payments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": { "type": "string" },
+              "amount": { "type": "number" },
+              "mode": { "type": "string" }
+            }
+          }
+        },
+        "isInclusive": { "type": "boolean" },
+        "isDeleted": { "type": "boolean", "default": false },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["invoiceNumber", "date", "partyId", "items", "grandTotal"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "salary": { "type": "number" },
+        "advanceBalance": { "type": "number" },
+        "joiningDate": { "type": "string" },
+        "isDeleted": { "type": "boolean", "default": false }
+      }
+    },
+    "EmployeePayment": {
+      "title": "Employee Payment",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["salary", "advance"] },
+        "date": { "type": "string" },
+        "mode": { "type": "string" }
+      }
+    },
+    "Expense": {
+      "title": "Expense",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "description": { "type": "string" },
+        "mode": { "type": "string" }
+      }
+    },
+    "Equipment": {
+      "title": "Equipment",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "purchaseDate": { "type": "string" },
+        "cost": { "type": "number" },
+        "status": { "type": "string" }
+      }
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Business settings like own GSTIN and address.",
+      "type": "object",
+      "properties": {
+        "businessName": { "type": "string" },
+        "gstin": { "type": "string" },
+        "address": { "type": "string" },
+        "stateCode": { "type": "string" },
+        "nextInvoiceNumber": { "type": "integer" }
+      }
+    }
+  },
+  "firestore": {
+    "/parties": { "schema": "Party", "description": "Collection of customers and vendors." },
+    "/items": { "schema": "Item", "description": "Collection of products and services." },
+    "/invoices": { "schema": "Invoice", "description": "Collection of generated invoices." },
+    "/estimations": { "schema": "Estimation", "description": "Quotes or proforma invoices that can be converted to invoices." },
+    "/employees": { "schema": "Employee", "description": "Collection of employees." },
+    "/employeePayments": { "schema": "EmployeePayment", "description": "Collection of employee payments." },
+    "/expenses": { "schema": "Expense", "description": "Collection of business expenses." },
+    "/equipments": { "schema": "Equipment", "description": "Collection of company equipments." },
+    "/settings": { "schema": "Settings", "description": "Global business settings (usually one doc)." }
+  }
+}

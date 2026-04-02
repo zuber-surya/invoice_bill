@@ -1,0 +1,5 @@
+{
+  "name": "GST Invoice Pro",
+  "description": "A complete Indian GST compliant invoice generator with party management, smart tax handling, and PDF export.",
+  "requestFramePermissions": []
+}

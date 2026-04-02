@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // For this app, we'll allow authenticated users to manage their own data.
+    // In a real multi-tenant app, we'd scope everything under /users/{userId}/...
+    // For simplicity in this generator, we'll allow any authenticated user to read/write.
+    // Ideally, we'd add a 'uid' field to every document.
+    
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
