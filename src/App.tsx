@@ -10,7 +10,7 @@ import {
 } from 'firebase/auth';
 import { collection, onSnapshot, query, orderBy, doc, where, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { Invoice, Estimation, Party, Item, BusinessSettings, Employee, Expense, Equipment } from './types';
+import { Invoice, Estimation, Party, Item, BusinessSettings, Employee, EmployeePayment, Expense, Equipment } from './types';
 import { Layout } from './components/Layout';
 import { InvoiceForm } from './components/InvoiceForm';
 import { InvoiceList } from './components/InvoiceList';
@@ -34,6 +34,7 @@ export default function App() {
   const [parties, setParties] = useState<Party[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeePayments, setEmployeePayments] = useState<EmployeePayment[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [settings, setSettings] = useState<BusinessSettings | null>(null);
@@ -81,6 +82,10 @@ export default function App() {
       setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
     });
 
+    const unsubEmployeePayments = onSnapshot(query(collection(db, 'employeePayments'), orderBy('date', 'desc')), (snapshot) => {
+      setEmployeePayments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmployeePayment)));
+    });
+
     const unsubExpenses = onSnapshot(query(collection(db, 'expenses'), orderBy('date', 'desc')), (snapshot) => {
       setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense)));
     });
@@ -101,6 +106,7 @@ export default function App() {
       unsubParties();
       unsubItems();
       unsubEmployees();
+      unsubEmployeePayments();
       unsubExpenses();
       unsubEquipments();
       unsubSettings();
@@ -108,11 +114,19 @@ export default function App() {
   }, [user]);
 
   const handleGoogleLogin = async () => {
+    setAuthError('');
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed', error);
+      let message = error.message;
+      if (error.code === 'auth/operation-not-allowed') {
+        message = 'Google login is not enabled in Firebase Console. Please enable it.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        message = `This domain (${window.location.hostname}) is not authorized for Firebase Auth. Please add it to the "Authorized domains" in Firebase Console.`;
+      }
+      setAuthError(message || 'Google login failed. Please ensure Google provider is enabled in Firebase Console and this domain is authorized.');
     }
   };
 
@@ -126,7 +140,13 @@ export default function App() {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (error: any) {
-      setAuthError(error.message);
+      let message = error.message;
+      if (error.code === 'auth/operation-not-allowed') {
+        message = 'This auth provider is not enabled in Firebase Console. Please enable Email/Password or Google provider.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        message = `This domain (${window.location.hostname}) is not authorized for Firebase Auth. Please add it to the "Authorized domains" in Firebase Console.`;
+      }
+      setAuthError(message);
     }
   };
 
@@ -240,6 +260,7 @@ export default function App() {
           invoices={invoices} 
           estimations={estimations}
           expenses={expenses} 
+          employeePayments={employeePayments}
           setActiveTab={setActiveTab}
         />
       )}
@@ -314,7 +335,7 @@ export default function App() {
         <ItemManager items={items} />
       )}
       {activeTab === 'employees' && (
-        <EmployeeManager employees={employees} />
+        <EmployeeManager employees={employees} payments={employeePayments} settings={settings} />
       )}
       {activeTab === 'expenses' && (
         <ExpenseManager expenses={expenses} />

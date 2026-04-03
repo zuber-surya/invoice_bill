@@ -1,18 +1,22 @@
 import { useState } from 'react';
 import { Employee, EmployeePayment } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
-import { Plus, Search, Edit2, Trash2, X, Wallet, History, Loader2, UserCircle, Phone, Calendar, CreditCard } from 'lucide-react';
-import { addDoc, collection, doc, updateDoc, query, where, onSnapshot, orderBy, arrayUnion, increment } from 'firebase/firestore';
+import { Plus, Search, Edit2, Trash2, X, Wallet, History, Loader2, UserCircle, Phone, Calendar, CreditCard, FileDown, Printer } from 'lucide-react';
+import { addDoc, collection, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { format } from 'date-fns';
+import { BusinessSettings } from '../types';
 
 interface EmployeeManagerProps {
   employees: Employee[];
+  payments: EmployeePayment[];
+  settings: BusinessSettings | null;
 }
 
-export function EmployeeManager({ employees }: EmployeeManagerProps) {
+export function EmployeeManager({ employees, payments, settings }: EmployeeManagerProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,6 +26,119 @@ export function EmployeeManager({ employees }: EmployeeManagerProps) {
     e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.designation.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const employeePayments = payments.filter(p => p.employeeId === selectedEmployee?.id);
+
+  const exportCSV = () => {
+    if (!selectedEmployee) return;
+    const headers = ['Date', 'Type', 'Amount', 'Remarks'];
+    const rows = employeePayments.map(p => [
+      p.date,
+      p.type.toUpperCase(),
+      p.amount.toString(),
+      p.remarks || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${selectedEmployee.name}_payments.csv`;
+    link.click();
+  };
+
+  const generateReport = () => {
+    if (!selectedEmployee) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const totalSalary = employeePayments.filter(p => p.type === 'salary').reduce((sum, p) => sum + p.amount, 0);
+    const totalAdvance = employeePayments.filter(p => p.type === 'advance').reduce((sum, p) => sum + p.amount, 0);
+
+    const html = `
+      <html>
+        <head>
+          <title>Employee Payment Report - ${selectedEmployee.name}</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; color: #333; }
+            .header { border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }
+            .business-name { font-size: 24px; font-weight: bold; color: #2563eb; }
+            .report-title { font-size: 18px; margin-top: 10px; color: #666; }
+            .employee-info { margin-bottom: 30px; }
+            .employee-info p { margin: 5px 0; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #eee; padding: 12px; text-align: left; font-size: 12px; }
+            th { bg-color: #f8fafc; font-weight: bold; }
+            .summary { margin-top: 30px; border-top: 2px solid #eee; pt: 20px; }
+            .summary-item { display: flex; justify-content: space-between; width: 300px; margin-bottom: 10px; font-size: 14px; }
+            .total { font-weight: bold; font-size: 16px; color: #2563eb; }
+            @media print { .no-print { display: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="business-name">${settings?.businessName || 'GST Invoice Pro'}</div>
+            <div class="report-title">Employee Payment Statement</div>
+          </div>
+          
+          <div class="employee-info">
+            <p><strong>Employee Name:</strong> ${selectedEmployee.name}</p>
+            <p><strong>Designation:</strong> ${selectedEmployee.designation}</p>
+            <p><strong>Monthly Salary:</strong> ${formatCurrency(selectedEmployee.salary)}</p>
+            <p><strong>Joining Date:</strong> ${selectedEmployee.joiningDate}</p>
+            <p><strong>Report Date:</strong> ${format(new Date(), 'dd MMM yyyy')}</p>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Remarks</th>
+                <th style="text-align: right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${employeePayments.map(p => `
+                <tr>
+                  <td>${p.date}</td>
+                  <td style="text-transform: capitalize;">${p.type}</td>
+                  <td>${p.remarks || '-'}</td>
+                  <td style="text-align: right;">${formatCurrency(p.amount)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="summary">
+            <div class="summary-item">
+              <span>Total Salary Paid:</span>
+              <span>${formatCurrency(totalSalary)}</span>
+            </div>
+            <div class="summary-item">
+              <span>Total Advance Given:</span>
+              <span>${formatCurrency(totalAdvance)}</span>
+            </div>
+            <div class="summary-item total">
+              <span>Net Paid:</span>
+              <span>${formatCurrency(totalSalary + totalAdvance)}</span>
+            </div>
+          </div>
+
+          <div class="no-print" style="margin-top: 40px;">
+            <button onclick="window.print()" style="padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer;">Print Report</button>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -142,8 +259,16 @@ export function EmployeeManager({ employees }: EmployeeManagerProps) {
                   <button 
                     onClick={() => { setSelectedEmployee(emp); setIsPaymentModalOpen(true); }}
                     className="p-2 text-blue-600 bg-blue-50 rounded-lg"
+                    title="Record Payment"
                   >
                     <Wallet className="w-3.5 h-3.5" />
+                  </button>
+                  <button 
+                    onClick={() => { setSelectedEmployee(emp); setIsHistoryModalOpen(true); }}
+                    className="p-2 text-purple-600 bg-purple-50 rounded-lg"
+                    title="Payment History"
+                  >
+                    <History className="w-3.5 h-3.5" />
                   </button>
                   <button 
                     onClick={() => { setEditingEmployee(emp); setIsModalOpen(true); }}
@@ -211,6 +336,13 @@ export function EmployeeManager({ employees }: EmployeeManagerProps) {
                         className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       >
                         <Wallet className="w-3.5 h-3.5" />
+                      </button>
+                      <button 
+                        onClick={() => { setSelectedEmployee(emp); setIsHistoryModalOpen(true); }}
+                        title="Payment History"
+                        className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                      >
+                        <History className="w-3.5 h-3.5" />
                       </button>
                       <button 
                         onClick={() => { setEditingEmployee(emp); setIsModalOpen(true); }}
@@ -395,6 +527,106 @@ export function EmployeeManager({ employees }: EmployeeManagerProps) {
                 Record Payment
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {isHistoryModalOpen && selectedEmployee && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Payment History</h3>
+                <p className="text-[10px] text-gray-500">{selectedEmployee.name} - {selectedEmployee.designation}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={exportCSV}
+                  className="p-2 text-gray-600 hover:bg-white rounded-lg transition-colors"
+                  title="Export CSV"
+                >
+                  <FileDown className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={generateReport}
+                  className="p-2 text-gray-600 hover:bg-white rounded-lg transition-colors"
+                  title="Generate Report"
+                >
+                  <Printer className="w-4 h-4" />
+                </button>
+                <button onClick={() => setIsHistoryModalOpen(false)} className="p-2 text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4">
+              {employeePayments.length === 0 ? (
+                <div className="text-center py-12">
+                  <History className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                  <p className="text-xs text-gray-400 italic">No payments recorded yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    <div className="p-3 bg-green-50 rounded-xl border border-green-100">
+                      <p className="text-[9px] font-bold text-green-600 uppercase">Total Salary</p>
+                      <p className="text-sm font-black text-green-900">
+                        {formatCurrency(employeePayments.filter(p => p.type === 'salary').reduce((sum, p) => sum + p.amount, 0))}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-orange-50 rounded-xl border border-orange-100">
+                      <p className="text-[9px] font-bold text-orange-600 uppercase">Total Advance</p>
+                      <p className="text-sm font-black text-orange-900">
+                        {formatCurrency(employeePayments.filter(p => p.type === 'advance').reduce((sum, p) => sum + p.amount, 0))}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Payment List */}
+                  <div className="space-y-2">
+                    {employeePayments.map((p) => (
+                      <div key={p.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between group">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-8 h-8 rounded-full flex items-center justify-center",
+                            p.type === 'salary' ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"
+                          )}>
+                            {p.type === 'salary' ? <Wallet className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-gray-900 capitalize">{p.type}</span>
+                              <span className="text-[10px] text-gray-400">{format(new Date(p.date), 'dd MMM yyyy')}</span>
+                            </div>
+                            <p className="text-[10px] text-gray-500">{p.remarks || 'No remarks'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-xs font-black text-gray-900">{formatCurrency(p.amount)}</span>
+                          <button 
+                            onClick={async () => {
+                              if (window.confirm('Delete this payment record?')) {
+                                try {
+                                  await deleteDoc(doc(db, 'employeePayments', p.id!));
+                                } catch (error) {
+                                  handleFirestoreError(error, OperationType.DELETE, `employeePayments/${p.id}`);
+                                }
+                              }
+                            }}
+                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

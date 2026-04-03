@@ -290,6 +290,11 @@ export function InvoiceForm({ parties, items, settings, onSuccess, initialData }
             placeholder="Select customer..."
             className="react-select-container text-xs"
             classNamePrefix="react-select"
+            menuPortalTarget={document.body}
+            menuPlacement="auto"
+            styles={{
+              menuPortal: (base) => ({ ...base, zIndex: 9999 })
+            }}
             onChange={(opt: any) => setSelectedParty(opt?.data || null)}
             value={selectedParty ? { value: selectedParty.id, label: selectedParty.name } : null}
           />
@@ -358,7 +363,7 @@ export function InvoiceForm({ parties, items, settings, onSuccess, initialData }
           <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
               <tr className="bg-gray-50/50 text-gray-400 text-[9px] uppercase tracking-widest border-b border-gray-100">
-                <th className="px-3 py-2 font-black">Item / Service</th>
+                <th className="px-3 py-2 font-black sticky left-0 bg-gray-50/50 z-20">Item / Service</th>
                 <th className="px-1 py-2 font-black w-20">HSN</th>
                 <th className="px-1 py-2 font-black w-16 text-center">Qty</th>
                 <th className="px-1 py-2 font-black w-24">Price</th>
@@ -370,13 +375,16 @@ export function InvoiceForm({ parties, items, settings, onSuccess, initialData }
             <tbody className="divide-y divide-gray-50">
               {lineItems.map((item, index) => (
                 <tr key={index} className="hover:bg-gray-50/30 transition-colors group">
-                  <td className="px-3 py-1.5">
+                  <td className="px-3 py-1.5 sticky left-0 bg-white group-hover:bg-gray-50/30 z-10 border-r border-gray-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                     <Select
                       options={itemOptions}
                       placeholder="Select..."
                       className="text-[11px] font-medium"
                       classNamePrefix="react-select"
+                      menuPortalTarget={document.body}
+                      menuPlacement="auto"
                       styles={{
+                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                         control: (base) => ({
                           ...base,
                           minHeight: '28px',

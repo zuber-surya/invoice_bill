@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Invoice, Expense, Estimation } from '../types';
+import { Invoice, Expense, Estimation, EmployeePayment } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
 import { 
   TrendingUp, 
@@ -34,12 +34,13 @@ interface DashboardProps {
   invoices: Invoice[];
   estimations: Estimation[];
   expenses: Expense[];
+  employeePayments: EmployeePayment[];
   setActiveTab: (tab: any) => void;
 }
 
 type DateRangeType = 'today' | 'yesterday' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'last_year' | 'all_time';
 
-export function Dashboard({ invoices, estimations, expenses, setActiveTab }: DashboardProps) {
+export function Dashboard({ invoices, estimations, expenses, employeePayments, setActiveTab }: DashboardProps) {
   const [dateRange, setDateRange] = useState<DateRangeType>('this_month');
   const now = new Date();
 
@@ -68,6 +69,7 @@ export function Dashboard({ invoices, estimations, expenses, setActiveTab }: Das
     const estimationTotal = filterBy(estimations, 'date', 'grandTotal', currentRange);
     const received = filterBy(invoices.flatMap(inv => inv.payments || []), 'date', 'amount', currentRange);
     const expenseTotal = filterBy(expenses, 'date', 'amount', currentRange);
+    const advanceTotal = filterBy(employeePayments.filter(p => p.type === 'advance'), 'date', 'amount', currentRange);
 
     const rangeInvoices = invoices.filter(inv => {
       const d = new Date(inv.date);
@@ -94,13 +96,14 @@ export function Dashboard({ invoices, estimations, expenses, setActiveTab }: Das
       estimationTotal,
       received,
       expenseTotal,
+      advanceTotal,
       pending,
       conversionRate,
       revenueToday,
       receivedToday,
       expenseToday
     };
-  }, [invoices, estimations, expenses, currentRange]);
+  }, [invoices, estimations, expenses, employeePayments, currentRange]);
 
   const stats = [
     { 
@@ -136,11 +139,19 @@ export function Dashboard({ invoices, estimations, expenses, setActiveTab }: Das
       sub: `Today: ${formatCurrency(metrics.expenseToday)}`
     },
     { 
+      label: 'Advances', 
+      value: metrics.advanceTotal, 
+      icon: Wallet, 
+      color: 'text-orange-600', 
+      bg: 'bg-orange-50',
+      sub: 'Employee Advances'
+    },
+    { 
       label: 'Pending', 
       value: metrics.pending, 
       icon: Clock, 
-      color: 'text-orange-600', 
-      bg: 'bg-orange-50',
+      color: 'text-amber-600', 
+      bg: 'bg-amber-50',
       sub: 'In Selected Range'
     },
   ];
@@ -175,11 +186,11 @@ export function Dashboard({ invoices, estimations, expenses, setActiveTab }: Das
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
         {stats.map((stat, i) => (
           <div key={i} className={cn(
             "bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-3 transition-all hover:shadow-md hover:border-gray-200",
-            i === 4 ? "col-span-2 lg:col-span-1" : ""
+            i >= 4 ? "col-span-1" : ""
           )}>
             <div className="flex items-center justify-between">
               <div className={cn("p-2 rounded-xl", stat.bg)}>
